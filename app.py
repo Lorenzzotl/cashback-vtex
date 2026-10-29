@@ -10,6 +10,7 @@ Rotas:
   GET  /admin/registrar-hook?token=    registra o hook de pedidos na VTEX
   GET  /admin/hook?token=              mostra a configuração atual do hook
   GET  /admin/gerar?token=&pedido=ID   gera o cupom de um pedido manualmente
+  GET  /admin/cancelar?token=&pedido=ID  cancela o cupom de um pedido manualmente
   GET  /admin/cupons?token=            lista os cupons gerados (JSON)
 
 O `token` é o valor da Config Var HOOK_SECRET.
@@ -61,12 +62,15 @@ def hook_vtex():
         return jsonify({"ignorado": True}), 200
 
     log(f"evento: pedido {order_id} -> {estado}")
-    if estado != "payment-approved":
+    if estado == "payment-approved":
+        alvo = cashback.processar
+    elif estado == "canceled":
+        alvo = cashback.cancelar
+    else:
         return jsonify({"ignorado": f"status {estado}"}), 200
 
     # responde 200 na hora (a VTEX exige resposta rápida) e processa depois
-    threading.Thread(target=cashback.processar,
-                     args=(order_id, estado), daemon=True).start()
+    threading.Thread(target=alvo, args=(order_id,), daemon=True).start()
     return jsonify({"ok": True}), 200
 
 
@@ -166,7 +170,7 @@ def registrar_hook():
     base = base.replace("http://", "https://").rstrip("/")
     url = f"{base}/vtex/hook"
     statuses = [s.strip() for s in os.environ.get(
-        "HOOK_STATUSES", "payment-approved").split(",") if s.strip()]
+        "HOOK_STATUSES", "payment-approved,canceled").split(",") if s.strip()]
     r = vtex.registrar_hook(url, os.environ["HOOK_SECRET"], statuses)
     return jsonify({
         "url_configurada": url,
@@ -197,6 +201,16 @@ def gerar_manual():
         return jsonify({"erro": "informe ?pedido=ID_DO_PEDIDO"}), 400
     resultado = cashback.processar(order_id, forcar=True)
     return jsonify(resultado)
+
+
+@app.get("/admin/cancelar")
+def cancelar_manual():
+    if not _token_ok():
+        return jsonify({"erro": "token inválido"}), 401
+    order_id = (request.args.get("pedido") or "").strip()
+    if not order_id:
+        return jsonify({"erro": "informe ?pedido=ID_DO_PEDIDO"}), 400
+    return jsonify(cashback.cancelar(order_id))
 
 
 @app.get("/admin/cupons")

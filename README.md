@@ -35,6 +35,9 @@ das datas fixas de calendário. Por isso o cashback sai como cupom.
      válido só em dezembro), com janela opcional de quais compras geram cupom.
 5. O app cria a promoção + cupom na VTEX e registra no Postgres (não duplica:
    o mesmo pedido nunca gera dois cupons, mesmo que a VTEX reenvie o evento).
+6. Se o pedido for **cancelado** na VTEX (`canceled`), o app desativa a
+   promoção e arquiva o cupom — o cashback morre junto com a compra. O painel
+   mostra o cupom como "cancelado".
 
 ## Rotas
 
@@ -46,6 +49,7 @@ das datas fixas de calendário. Por isso o cashback sai como cupom.
 | `GET /admin/registrar-hook?token=` | Registra/reativa o hook de pedidos na VTEX |
 | `GET /admin/hook?token=` | Mostra a configuração atual do hook |
 | `GET /admin/gerar?token=&pedido=ID` | Gera o cupom de um pedido manualmente (ignora o liga/desliga) |
+| `GET /admin/cancelar?token=&pedido=ID` | Cancela o cupom de um pedido manualmente |
 | `GET /admin/cupons?token=` | Lista os cupons gerados em JSON |
 
 O `token` é o valor da Config Var `HOOK_SECRET`.
@@ -60,7 +64,7 @@ O `token` é o valor da Config Var `HOOK_SECRET`.
 | `HOOK_SECRET` | token longo aleatório — protege o webhook, o painel e as rotas /admin |
 | `DATABASE_URL` | criada automaticamente pelo add-on Heroku Postgres |
 
-Opcionais: `HOOK_STATUSES` (padrão `payment-approved`), `FUSO` (padrão
+Opcionais: `HOOK_STATUSES` (padrão `payment-approved,canceled`), `FUSO` (padrão
 `America/Sao_Paulo` — fuso das datas fixas do painel), `APP_URL` (força a URL
 pública do app, se necessário).
 
@@ -118,7 +122,8 @@ abra o link de registrar o hook, que reativa na hora.
 - O desconto do cupom é **nominal e fixo** (valor em reais calculado na
   geração); o "máximo de 12,5%" vira a compra mínima — em compras maiores o
   desconto representa menos de 12,5%, nunca mais.
-- Pedidos com múltiplos pagamentos/cancelamento posterior não estornam o
-  cupom automaticamente; é possível arquivar a promoção no admin da VTEX.
+- O cancelamento automático depende do evento `canceled` da VTEX; se o cupom
+  cancelado já tiver sido usado antes do cancelamento, a VTEX não estorna o
+  desconto da outra compra.
 - O hook cobre eventos daqui pra frente; para gerar cupom de um pedido antigo
   use `/admin/gerar?token=…&pedido=ID`.

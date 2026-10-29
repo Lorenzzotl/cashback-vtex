@@ -167,3 +167,49 @@ def processar(order_id, estado="payment-approved", forcar=False):
     return {"ok": True, "cupom": codigo, "valor": valor,
             "compra_minima": minimo_uso, "inicio": inicio.isoformat(),
             "fim": fim.isoformat(), "id_promocao": id_promocao}
+
+
+# ------------------------------------------------------------------ cancelamento
+
+def cancelar(order_id):
+    """Pedido cancelado na VTEX => desativa a promoção e arquiva o cupom."""
+    dados = armazem.dados_cupom(order_id)
+    if not dados:
+        log(f"pedido {order_id} cancelado: nenhum cupom gerado — nada a fazer")
+        return {"ignorado": "pedido sem cupom de cashback"}
+    if dados["status"] == "cancelado":
+        log(f"pedido {order_id} cancelado: cupom {dados['codigo']} "
+            "já estava cancelado")
+        return {"ignorado": f"cupom {dados['codigo']} já cancelado"}
+
+    codigo = dados["codigo"]
+    erros = []
+
+    if dados["id_promocao"]:
+        try:
+            r = vtex.desativar_promocao(dados["id_promocao"])
+            if r.status_code not in (200, 201, 204):
+                erros.append(f"promoção {dados['id_promocao']}: "
+                             f"{r.status_code} {r.text[:200]}")
+        except Exception as e:  # noqa: BLE001
+            erros.append(f"promoção {dados['id_promocao']}: {e}")
+    else:
+        erros.append("cupom sem id de promoção registrado — desative a "
+                     "promoção manualmente no admin da VTEX")
+
+    try:
+        r = vtex.arquivar_cupom(codigo)
+        if r.status_code not in (200, 201, 204):
+            erros.append(f"cupom {codigo}: {r.status_code} {r.text[:200]}")
+    except Exception as e:  # noqa: BLE001
+        erros.append(f"cupom {codigo}: {e}")
+
+    if erros:
+        log(f"pedido {order_id} cancelado: falha ao cancelar o cashback — "
+            + "; ".join(erros))
+        return {"erro": "; ".join(erros)}
+
+    armazem.marcar_cancelado(order_id)
+    log(f"pedido {order_id} cancelado: cupom {codigo} arquivado e "
+        f"promoção {dados['id_promocao']} desativada")
+    return {"ok": True, "cupom_cancelado": codigo}

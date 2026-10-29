@@ -135,6 +135,26 @@ def criar_cupom(codigo, max_usos=1):
                          headers=_headers(), json=corpo, timeout=30)
 
 
+def arquivar_cupom(codigo):
+    """Arquiva o cupom na VTEX; se o endpoint não existir na conta,
+    regrava o cupom com isArchived=true."""
+    r = requests.post(f"{_base()}/api/rnb/pvt/coupon/{codigo}/archive",
+                      headers=_headers(), timeout=30)
+    if r.status_code in (200, 201, 204):
+        return r
+    corpo = {
+        "utmSource": codigo,
+        "utmCampaign": codigo,
+        "couponCode": codigo,
+        "isArchived": True,
+        "maxItemsPerClient": 1,
+        "expirationIntervalPerUse": "00:00:00",
+        "maxUsage": 1,
+    }
+    return requests.post(f"{_base()}/api/rnb/pvt/coupon",
+                         headers=_headers(), json=corpo, timeout=30)
+
+
 def cupom_existe(codigo):
     try:
         r = requests.get(f"{_base()}/api/rnb/pvt/coupon/{codigo}",

@@ -61,6 +61,8 @@ def preparar():
                          fim        TEXT,
                          id_promocao TEXT,
                          criado_em  TEXT)""")
+        c.execute("""ALTER TABLE cashback_cupons
+                     ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'ativo'""")
 
 
 # ------------------------------------------------------------------ JSON local
@@ -111,15 +113,43 @@ def salvar_config(novos):
 # ------------------------------------------------------------------ cupons
 
 def cupom_do_pedido(order_id):
+    dados = dados_cupom(order_id)
+    return dados.get("codigo") if dados else None
+
+
+def dados_cupom(order_id):
+    """Registro completo do cupom de um pedido (ou None)."""
     if _usa_postgres():
         with _conexao() as cx, cx.cursor() as c:
-            c.execute("""SELECT codigo FROM cashback_cupons
-                         WHERE order_id = %s""", (order_id,))
+            c.execute("""SELECT codigo, id_promocao, status
+                         FROM cashback_cupons WHERE order_id = %s""",
+                      (order_id,))
             linha = c.fetchone()
-            return linha[0] if linha else None
+            if not linha:
+                return None
+            return {"codigo": linha[0], "id_promocao": linha[1],
+                    "status": linha[2] or "ativo"}
     with _trava:
         cupom = (_ler_arquivo().get("cupons") or {}).get(order_id)
-        return cupom.get("codigo") if cupom else None
+    if not cupom:
+        return None
+    return {"codigo": cupom.get("codigo"),
+            "id_promocao": cupom.get("id_promocao"),
+            "status": cupom.get("status") or "ativo"}
+
+
+def marcar_cancelado(order_id):
+    if _usa_postgres():
+        with _conexao() as cx, cx.cursor() as c:
+            c.execute("""UPDATE cashback_cupons SET status = 'cancelado'
+                         WHERE order_id = %s""", (order_id,))
+        return
+    with _trava:
+        dados = _ler_arquivo()
+        cupom = (dados.get("cupons") or {}).get(order_id)
+        if cupom:
+            cupom["status"] = "cancelado"
+            _gravar_arquivo(dados)
 
 
 def registrar_cupom(order_id, codigo, nome, valor, minimo,
@@ -129,8 +159,8 @@ def registrar_cupom(order_id, codigo, nome, valor, minimo,
         with _conexao() as cx, cx.cursor() as c:
             c.execute("""INSERT INTO cashback_cupons
                            (order_id, codigo, nome, valor, minimo,
-                            inicio, fim, id_promocao, criado_em)
-                         VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                            inicio, fim, id_promocao, criado_em, status)
+                         VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,'ativo')
                          ON CONFLICT (order_id) DO NOTHING""",
                       (order_id, codigo, nome, valor, minimo,
                        inicio, fim, id_promocao, criado))
@@ -141,6 +171,7 @@ def registrar_cupom(order_id, codigo, nome, valor, minimo,
             "codigo": codigo, "nome": nome, "valor": valor,
             "minimo": minimo, "inicio": inicio, "fim": fim,
             "id_promocao": id_promocao, "criado_em": criado,
+            "status": "ativo",
         }
         _gravar_arquivo(dados)
 
@@ -149,12 +180,13 @@ def listar_cupons(limite=100):
     if _usa_postgres():
         with _conexao() as cx, cx.cursor() as c:
             c.execute("""SELECT order_id, codigo, nome, valor, minimo,
-                                inicio, fim, criado_em
+                                inicio, fim, criado_em, status
                          FROM cashback_cupons
                          ORDER BY criado_em DESC LIMIT %s""", (limite,))
             return [{"order_id": l[0], "codigo": l[1], "nome": l[2],
                      "valor": float(l[3] or 0), "minimo": float(l[4] or 0),
-                     "inicio": l[5], "fim": l[6], "criado_em": l[7]}
+                     "inicio": l[5], "fim": l[6], "criado_em": l[7],
+                     "status": l[8] or "ativo"}
                     for l in c.fetchall()]
     with _trava:
         cupons = _ler_arquivo().get("cupons") or {}

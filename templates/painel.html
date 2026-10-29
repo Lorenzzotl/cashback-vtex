@@ -43,6 +43,12 @@
   legend { font-size:13px; font-weight:700; padding:0 6px; }
   .modo label { display:inline-flex; align-items:center; gap:6px;
                 font-weight:600; margin-right:24px; }
+  tr.cancelado td { color:#9aa6b2; }
+  tr.cancelado strong { text-decoration:line-through; }
+  .selo-ativo, .selo-cancelado { font-size:11px; font-weight:700;
+    padding:2px 8px; border-radius:10px; white-space:nowrap; }
+  .selo-ativo { background:#e6f6ea; color:#1d7a35; }
+  .selo-cancelado { background:#fdeaea; color:#b23030; }
 </style>
 </head>
 <body>
@@ -155,11 +161,13 @@
   {% if cupons %}
   <div style="overflow-x:auto">
   <table>
-    <tr><th>Código</th><th>Cliente</th><th>Pedido</th><th>Valor</th>
+    <tr><th>Código</th><th>Situação</th><th>Cliente</th><th>Pedido</th><th>Valor</th>
         <th>Compra mínima</th><th>Vale de</th><th>Até</th><th>Gerado em (UTC)</th></tr>
     {% for c in cupons %}
-    <tr>
+    <tr{% if c.status == "cancelado" %} class="cancelado"{% endif %}>
       <td><strong>{{ c.codigo }}</strong></td>
+      <td>{% if c.status == "cancelado" %}<span class="selo-cancelado">cancelado</span>
+          {% else %}<span class="selo-ativo">ativo</span>{% endif %}</td>
       <td>{{ c.nome or "—" }}</td>
       <td>{{ c.order_id }}</td>
       <td class="num">R$ {{ "%.2f"|format(c.valor or 0) }}</td>
