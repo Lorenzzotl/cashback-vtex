@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+dados_local.json
+.env

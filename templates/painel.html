@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel do Cashback</title>
+<style>
+  :root { --azul:#0f3c6e; --fundo:#f4f6f9; --borda:#d8dee7; }
+  * { box-sizing:border-box; }
+  body { font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+         background:var(--fundo); margin:0; color:#1c2733; }
+  .topo { background:var(--azul); color:#fff; padding:16px 24px; }
+  .topo h1 { margin:0; font-size:20px; }
+  main { max-width:960px; margin:24px auto; padding:0 16px 48px; }
+  .cartao { background:#fff; border:1px solid var(--borda); border-radius:10px;
+            padding:20px 24px; margin-bottom:20px; }
+  h2 { font-size:16px; margin:0 0 14px; color:var(--azul); }
+  label { display:block; font-size:13px; font-weight:600; margin:12px 0 4px; }
+  .dica { font-weight:400; color:#5b6b7c; }
+  input[type=number], input[type=text], input[type=date] {
+    width:100%; max-width:260px; padding:8px 10px; border:1px solid var(--borda);
+    border-radius:6px; font-size:14px; }
+  .linha { display:flex; flex-wrap:wrap; gap:0 32px; }
+  .linha > div { flex:1 1 240px; }
+  .ligar { display:flex; align-items:center; gap:10px; font-size:15px;
+           font-weight:600; margin:0; }
+  .ligar input { width:20px; height:20px; }
+  .exemplo { background:#eef5ff; border:1px solid #c6dcf5; border-radius:8px;
+             padding:12px 14px; font-size:13px; margin-top:16px; }
+  .salvo { background:#e6f6ea; border:1px solid #9fd8ae; border-radius:8px;
+           padding:10px 14px; margin-bottom:16px; font-size:14px; }
+  button { background:var(--azul); color:#fff; border:0; border-radius:8px;
+           padding:12px 28px; font-size:15px; font-weight:600; cursor:pointer;
+           margin-top:20px; }
+  button:hover { filter:brightness(1.15); }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--borda); }
+  th { color:#5b6b7c; font-weight:600; white-space:nowrap; }
+  td.num { white-space:nowrap; }
+  .vazio { color:#5b6b7c; font-size:14px; }
+  fieldset { border:1px solid var(--borda); border-radius:8px;
+             margin:14px 0 0; padding:4px 16px 16px; }
+  legend { font-size:13px; font-weight:700; padding:0 6px; }
+  .modo label { display:inline-flex; align-items:center; gap:6px;
+                font-weight:600; margin-right:24px; }
+</style>
+</head>
+<body>
+<div class="topo"><h1>Painel do Cashback — VTEX</h1></div>
+<main>
+
+{% if salvo %}<div class="salvo">Configuração salva. Vale para os próximos pedidos pagos.</div>{% endif %}
+
+<form method="post" action="/painel">
+  <input type="hidden" name="token" value="{{ token }}">
+
+  <div class="cartao">
+    <label class="ligar">
+      <input type="checkbox" name="ativo" value="1" {% if cfg.ativo == "1" %}checked{% endif %}>
+      Gerar cupom de cashback a cada pedido pago
+    </label>
+  </div>
+
+  <div class="cartao">
+    <h2>Valor do cupom</h2>
+    <div class="linha">
+      <div>
+        <label>Percentual da compra que vira cashback (%)
+          <span class="dica">— ex.: 15 gera um cupom de R$ 150 numa compra de R$ 1.000</span></label>
+        <input type="number" name="percentual" step="0.1" min="0.1" max="100"
+               value="{{ cfg.percentual }}" required>
+      </div>
+      <div>
+        <label>Desconto máximo na compra em que for usado (%)
+          <span class="dica">— ex.: 12,5 faz um cupom de R$ 125 valer só em compras a partir de R$ 1.000. Use 0 para não exigir compra mínima</span></label>
+        <input type="number" name="percentual_maximo" step="0.1" min="0" max="100"
+               value="{{ cfg.percentual_maximo }}" required>
+      </div>
+    </div>
+    <div class="linha">
+      <div>
+        <label>Compra mínima para GERAR o cashback (R$)
+          <span class="dica">— 0 = qualquer compra gera</span></label>
+        <input type="number" name="pedido_minimo" step="0.01" min="0"
+               value="{{ cfg.pedido_minimo }}" required>
+      </div>
+      <div>
+        <label>Prefixo do código do cupom
+          <span class="dica">— o código sai como PREFIXO-NOME-NºDOPEDIDO</span></label>
+        <input type="text" name="prefixo" maxlength="12" value="{{ cfg.prefixo }}" required>
+      </div>
+    </div>
+    <div class="exemplo">{{ exemplo }}</div>
+  </div>
+
+  <div class="cartao">
+    <h2>Vigência do cupom</h2>
+    <div class="modo">
+      <label><input type="radio" name="modo" value="relativo"
+        {% if cfg.modo != "fixo" %}checked{% endif %} onchange="trocaModo()"> Dias contados a partir da compra</label>
+      <label><input type="radio" name="modo" value="fixo"
+        {% if cfg.modo == "fixo" %}checked{% endif %} onchange="trocaModo()"> Datas fixas de calendário</label>
+    </div>
+
+    <fieldset id="caixa-relativo">
+      <legend>Dias contados a partir da compra</legend>
+      <div class="linha">
+        <div>
+          <label>Libera para uso após (dias)
+            <span class="dica">— ex.: 15 = quem compra hoje só usa daqui a 15 dias</span></label>
+          <input type="number" name="dias_liberar" min="0" max="365"
+                 value="{{ cfg.dias_liberar }}">
+        </div>
+        <div>
+          <label>Expira após (dias, contados da compra)
+            <span class="dica">— ex.: 60 = o cupom morre 60 dias depois da compra</span></label>
+          <input type="number" name="dias_validade" min="1" max="730"
+                 value="{{ cfg.dias_validade }}">
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset id="caixa-fixo">
+      <legend>Datas fixas de calendário</legend>
+      <div class="linha">
+        <div>
+          <label>Cupom vale a partir de</label>
+          <input type="date" name="fixo_inicio" value="{{ cfg.fixo_inicio }}">
+        </div>
+        <div>
+          <label>Cupom vale até</label>
+          <input type="date" name="fixo_fim" value="{{ cfg.fixo_fim }}">
+        </div>
+      </div>
+      <div class="linha">
+        <div>
+          <label>Só gerar para compras a partir de <span class="dica">— opcional</span></label>
+          <input type="date" name="fixo_gerar_inicio" value="{{ cfg.fixo_gerar_inicio }}">
+        </div>
+        <div>
+          <label>Só gerar para compras até <span class="dica">— opcional</span></label>
+          <input type="date" name="fixo_gerar_fim" value="{{ cfg.fixo_gerar_fim }}">
+        </div>
+      </div>
+      <p class="dica" style="margin:12px 0 0">Exemplo: gerar para compras de 1 a 30 de
+        novembro e deixar o cupom valer de 1 a 31 de dezembro.</p>
+    </fieldset>
+
+    <button type="submit">Salvar configuração</button>
+  </div>
+</form>
+
+<div class="cartao">
+  <h2>Cupons gerados ({{ cupons|length }})</h2>
+  {% if cupons %}
+  <div style="overflow-x:auto">
+  <table>
+    <tr><th>Código</th><th>Cliente</th><th>Pedido</th><th>Valor</th>
+        <th>Compra mínima</th><th>Vale de</th><th>Até</th><th>Gerado em (UTC)</th></tr>
+    {% for c in cupons %}
+    <tr>
+      <td><strong>{{ c.codigo }}</strong></td>
+      <td>{{ c.nome or "—" }}</td>
+      <td>{{ c.order_id }}</td>
+      <td class="num">R$ {{ "%.2f"|format(c.valor or 0) }}</td>
+      <td class="num">{% if c.minimo %}R$ {{ "%.2f"|format(c.minimo) }}{% else %}—{% endif %}</td>
+      <td class="num">{{ (c.inicio or "")[:10] }}</td>
+      <td class="num">{{ (c.fim or "")[:10] }}</td>
+      <td class="num">{{ c.criado_em or "" }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  </div>
+  {% else %}
+  <p class="vazio">Nenhum cupom gerado ainda. Eles aparecem aqui assim que um
+    pedido for pago (ou ao usar /admin/gerar?token=…&pedido=ID).</p>
+  {% endif %}
+</div>
+
+</main>
+<script>
+function trocaModo() {
+  var fixo = document.querySelector('input[name=modo][value=fixo]').checked;
+  document.getElementById('caixa-fixo').style.display = fixo ? '' : 'none';
+  document.getElementById('caixa-relativo').style.display = fixo ? 'none' : '';
+}
+trocaModo();
+</script>
+</body>
+</html>
