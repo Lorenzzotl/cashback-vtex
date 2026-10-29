@@ -18,10 +18,11 @@ O `token` é o valor da Config Var HOOK_SECRET.
 import os
 import threading
 
-from flask import Flask, jsonify, redirect, render_template, request
+from flask import Flask, jsonify, redirect, render_template_string, request
 
 import armazem
 import cashback
+import painel_html
 import vtex
 from util import log, numero
 
@@ -87,9 +88,10 @@ def painel():
         log(f"aviso: não li os cupons: {e}")
         cupons = []
     exemplo = _exemplo(cfg)
-    return render_template("painel.html", cfg=cfg, cupons=cupons,
-                           exemplo=exemplo, token=request.args.get("token"),
-                           salvo=request.args.get("salvo") == "1")
+    return render_template_string(painel_html.PAGINA, cfg=cfg, cupons=cupons,
+                                  exemplo=exemplo,
+                                  token=request.args.get("token"),
+                                  salvo=request.args.get("salvo") == "1")
 
 
 @app.post("/painel")

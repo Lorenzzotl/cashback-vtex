@@ -1,4 +1,7 @@
-<!doctype html>
+# -*- coding: utf-8 -*-
+"""HTML do painel, embutido para não depender da pasta templates no deploy."""
+
+PAGINA = r"""<!doctype html>
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
@@ -196,3 +199,4 @@ trocaModo();
 </script>
 </body>
 </html>
+"""

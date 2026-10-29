@@ -112,7 +112,7 @@ abra o link de registrar o hook, que reativa na hora.
 | `vtex.py` | Cliente das APIs da VTEX (OMS, Hook, Promoções, Cupons) |
 | `armazem.py` | Persistência (Heroku Postgres; JSON local em desenvolvimento) |
 | `util.py` | Log e normalizações |
-| `templates/painel.html` | O painel |
+| `painel_html.py` | O HTML do painel (embutido no código) |
 | `Procfile` / `requirements.txt` | Configuração da Heroku |
 
 ## Limitações conhecidas
