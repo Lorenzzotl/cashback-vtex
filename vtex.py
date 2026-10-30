@@ -78,6 +78,7 @@ def criar_promocao(nome, descricao, codigo, valor, minimo,
         "isArchived": False,
         "isFeatured": False,
         "type": "regular",
+        "origin": "Marketplace",
         "utmSource": codigo,
         "utmCampain": codigo,  # grafia errada é da própria API da VTEX
         "nominalDiscountValue": valor,
